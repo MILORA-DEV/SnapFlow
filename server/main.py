@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+# Ensure these imports exist in your 'server' folder
 from server.auth import verify_client_api_key
 from server.config import (
     OPENAI_API_KEY,
@@ -19,25 +20,24 @@ from server.config import (
     SYSTEM_PROMPT,
 )
 
+# GUI imports (customtkinter) have been removed to prevent 
+# server-side crashes in a headless environment.
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SnapFlow Server", version="1.0.0")
 
-
 class ProcessRequest(BaseModel):
     image: str = Field(..., description="Base64-encoded PNG screenshot")
-
 
 class ProcessResponse(BaseModel):
     type: str
     data: str
 
-
 @app.get("/health")
 async def health(_: None = Depends(verify_client_api_key)) -> dict[str, str]:
     return {"status": "ok"}
-
 
 @app.post("/process", response_model=ProcessResponse)
 async def process_image(
@@ -75,15 +75,10 @@ async def process_image(
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text",
-                            "text": "Analyze this screenshot and return the JSON action.",
-                        },
+                        {"type": "text", "text": "Analyze this screenshot and return the JSON action."},
                         {
                             "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{image_b64}",
-                            },
+                            "image_url": {"url": f"data:image/png;base64,{image_b64}"},
                         },
                     ],
                 },
