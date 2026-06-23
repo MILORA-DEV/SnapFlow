@@ -102,12 +102,17 @@ def get_settings() -> AppSettings:
     return get_settings_manager().settings
 
 def get_server_config() -> ServerConfig:
-    appdata_env = DATA_DIR / ".env"
-    if appdata_env.exists():
-        load_dotenv(appdata_env, override=True)
-    elif ENV_PATH.exists():
-        load_dotenv(ENV_PATH, override=True)
+    """Read server config from settings.json — works in both source and frozen exe."""
+    url = "http://localhost:8000"
+    api_key = ""
+    if SETTINGS_PATH.exists():
+        try:
+            raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+            url = raw.get("server_url", url)
+            api_key = raw.get("api_key", api_key)
+        except (json.JSONDecodeError, TypeError):
+            pass
     return ServerConfig(
-        url=os.getenv("SNAPFLOW_SERVER_URL", "http://localhost:8000").rstrip("/"),
-        api_key=os.getenv("SNAPFLOW_API_KEY", ""),
+        url=url.rstrip("/"),
+        api_key=api_key,
     )
