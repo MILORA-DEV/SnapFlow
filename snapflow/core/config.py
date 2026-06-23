@@ -9,6 +9,12 @@ from dotenv import dotenv_values, load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
+# Fix ENV_PATH to always sit next to the .exe (or project root in dev)
+if getattr(sys, "frozen", False):
+    ENV_PATH = Path(sys.executable).parent / ".env"
+else:
+    ENV_PATH = PROJECT_ROOT / ".env"
+
 def get_data_dir() -> Path:
     """Persistent app data directory (portable when running from source)."""
     if getattr(sys, "frozen", False):
@@ -22,7 +28,6 @@ DATA_DIR = get_data_dir()
 SETTINGS_PATH = DATA_DIR / "settings.json"
 HISTORY_PATH = DATA_DIR / "history.json"
 OUTPUT_DIR = DATA_DIR / "output"
-ENV_PATH = PROJECT_ROOT / ".env"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 @dataclass
@@ -85,34 +90,4 @@ class SettingsManager:
         existing = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
         lines = [
             f"SNAPFLOW_HOTKEY={self._settings.hotkey}",
-            f"SNAPFLOW_SERVER_URL={existing.get('SNAPFLOW_SERVER_URL', 'http://localhost:8000')}",
-            f"SNAPFLOW_API_KEY={existing.get('SNAPFLOW_API_KEY', '')}",
-        ]
-        ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-_settings_manager: SettingsManager | None = None
-
-def get_settings_manager() -> SettingsManager:
-    global _settings_manager
-    if _settings_manager is None:
-        _settings_manager = SettingsManager()
-    return _settings_manager
-
-def get_settings() -> AppSettings:
-    return get_settings_manager().settings
-
-def get_server_config() -> ServerConfig:
-    """Read server config from settings.json — works in both source and frozen exe."""
-    url = "http://localhost:8000"
-    api_key = ""
-    if SETTINGS_PATH.exists():
-        try:
-            raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-            url = raw.get("server_url", url)
-            api_key = raw.get("api_key", api_key)
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return ServerConfig(
-        url=url.rstrip("/"),
-        api_key=api_key,
-    )
+            f"SNAPFLOW_SERVER_URL={existing.get('SNAPFLOW_SERVER_URL',
