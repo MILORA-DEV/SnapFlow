@@ -117,6 +117,7 @@ def get_server_config() -> ServerConfig:
     """Server URL and client auth key — configured via .env, not exposed in UI."""
     load_dotenv(ENV_PATH)
     return ServerConfig(
-        url=os.getenv("SNAPFLOW_SERVER_URL", "http://localhost:8000").rstrip("/"),
+        # CHANGE THE LINE BELOW
+        url=os.getenv("SNAPFLOW_SERVER_URL", "https://snapflow.onrender.com").rstrip("/"),
         api_key=os.getenv("SNAPFLOW_API_KEY", ""),
     )
