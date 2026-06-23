@@ -114,10 +114,14 @@ def get_settings() -> AppSettings:
 
 
 def get_server_config() -> ServerConfig:
-    """Server URL and client auth key — configured via .env, not exposed in UI."""
-    load_dotenv(ENV_PATH)
+    # When frozen as exe, load from APPDATA first
+    appdata_env = DATA_DIR / ".env"
+    if appdata_env.exists():
+        load_dotenv(appdata_env, override=True)
+    elif ENV_PATH.exists():
+        load_dotenv(ENV_PATH, override=True)
+    
     return ServerConfig(
-        # CHANGE THE LINE BELOW
-        url=os.getenv("SNAPFLOW_SERVER_URL", "https://snapflow.onrender.com").rstrip("/"),
+        url=os.getenv("SNAPFLOW_SERVER_URL", "http://localhost:8000").rstrip("/"),
         api_key=os.getenv("SNAPFLOW_API_KEY", ""),
     )
