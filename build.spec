@@ -3,34 +3,50 @@
 
 import sys
 from pathlib import Path
-
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 block_cipher = None
 project_root = Path(SPECPATH)
 
-datas = collect_data_files("customtkinter")
-hiddenimports = collect_submodules("snapflow")
+# Collect ALL customtkinter data files — this is what was missing
+datas = collect_data_files("customtkinter", include_py_files=True)
+
+hiddenimports = (
+    collect_submodules("customtkinter")
+    + collect_submodules("snapflow")
+    + [
+        "pystray",
+        "pystray._win32",
+        "PIL._tkinter_finder",
+        "PIL.Image",
+        "PIL.ImageDraw",
+        "keyboard",
+        "mss",
+        "mss.windows",
+        "pyperclip",
+        "requests",
+        "tkinter",
+        "tkinter.ttk",
+        "_tkinter",
+    ]
+)
 
 a = Analysis(
     [str(project_root / "main.py")],
     pathex=[str(project_root)],
     binaries=[],
     datas=datas,
-    hiddenimports=hiddenimports
-    + [
-        "pystray",
-        "pystray._win32",
-        "PIL._tkinter_finder",
-        "keyboard",
-        "mss",
-        "pyperclip",
-        "requests",
-    ],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # Exclude server-side stuff from the desktop build
+        "fastapi",
+        "uvicorn",
+        "openai",
+        "pyinstaller",
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -53,7 +69,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=False,  # No console window
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
