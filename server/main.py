@@ -1,136 +1,79 @@
-"""SnapFlow processing server."""
+"""
+Example backend server for SnapFlow desktop app.
+This is a reference implementation for the Render backend.
+Deploy this to Render or your preferred hosting service.
+"""
 
-from __future__ import annotations
-
-import json
+from fastapi import FastAPI, HTTPException, Header
+from pydantic import BaseModel
 import logging
-from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, status
-from openai import OpenAI
-from pydantic import BaseModel, Field
+# Gatekeeper API key (must match desktop client)
+GATEKEEPER_KEY = "Sf9!kX27#mQ_vPz4"
 
-# Ensure these imports exist in your 'server' folder
-from server.auth import verify_client_api_key
-from server.config import (
-    OPENAI_API_KEY,
-    OPENAI_MODEL,
-    OPENROUTER_BASE_URL,
-    OPENROUTER_REFERER,
-    SYSTEM_PROMPT,
-)
-
-# GUI imports (customtkinter) have been removed to prevent 
-# server-side crashes in a headless environment.
+app = FastAPI(title="SnapFlow Server")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="SnapFlow Server", version="1.0.0")
 
 class ProcessRequest(BaseModel):
-    image: str = Field(..., description="Base64-encoded PNG screenshot")
+    """Request model matching desktop client payload."""
+    image: str  # Base64 encoded PNG image
+
 
 class ProcessResponse(BaseModel):
-    type: str
-    data: str
+    """Response model matching desktop client expectations."""
+    type: str  # Action type: "calendar", "code", "map_link", "markdown", etc.
+    data: str  # Action data (URL, code snippet, etc.)
+
 
 @app.get("/health")
-async def health(_: None = Depends(verify_client_api_key)) -> dict[str, str]:
+async def health_check():
+    """Health check endpoint for desktop client connection polling."""
     return {"status": "ok"}
 
+
 @app.post("/process", response_model=ProcessResponse)
-async def process_image(
-    body: ProcessRequest,
-    _: None = Depends(verify_client_api_key),
-) -> ProcessResponse:
-    if not OPENAI_API_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OPENAI_API_KEY is not configured on the server.",
-        )
-
-    image_b64 = body.image.strip()
-    if not image_b64:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Image payload is empty.",
-        )
-
-    client = OpenAI(
-        api_key=OPENAI_API_KEY,
-        base_url=OPENROUTER_BASE_URL,
-        default_headers={
-            "HTTP-Referer": OPENROUTER_REFERER,
-            "X-Title": "SnapFlow",
-        },
+async def process_screenshot(
+    request: ProcessRequest,
+    x_api_key: str = Header(..., alias="X-API-Key")
+):
+    """
+    Process screenshot and return action.
+    
+    Desktop client sends:
+    - Header: X-API-Key: Sf9!kX27#mQ_vPz4
+    - Body: {"image": "base64_encoded_png"}
+    
+    This endpoint should:
+    1. Validate the API key
+    2. Decode the base64 image
+    3. Send to AI vision model (OpenAI GPT-4 Vision, etc.)
+    4. Parse the response into an action type and data
+    5. Return the action to the desktop client
+    """
+    # Validate API key
+    if x_api_key != GATEKEEPER_KEY:
+        logger.warning("Unauthorized access attempt with key: %s", x_api_key[:10] + "...")
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    logger.info("Processing screenshot request (image length: %d chars)", len(request.image))
+    
+    # TODO: Implement your AI vision logic here
+    # 1. Decode base64 image
+    # 2. Send to OpenAI GPT-4 Vision or similar
+    # 3. Parse response to determine action type
+    # 4. Return appropriate action
+    
+    # Example placeholder response
+    # Replace this with your actual AI processing logic
+    return ProcessResponse(
+        type="markdown",
+        data="# Example Response\n\nThis is where your AI analysis results go."
     )
 
-    try:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Analyze this screenshot and return the JSON action."},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{image_b64}"},
-                        },
-                    ],
-                },
-            ],
-            max_tokens=2048,
-        )
-    except Exception as exc:
-        logger.exception("Vision API call failed")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Vision API call failed: {exc}",
-        ) from exc
 
-    raw = (response.choices[0].message.content or "").strip()
-    if not raw:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Empty response from the vision model.",
-        )
-
-    try:
-        payload: dict[str, Any] = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Invalid JSON from vision model: {raw[:200]}",
-        ) from exc
-
-    action_type = str(payload.get("type", "")).strip().lower()
-    data = payload.get("data", "")
-
-    if isinstance(data, dict):
-        data = json.dumps(data)
-    else:
-        data = str(data)
-
-    if not action_type:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Vision model response missing 'type'.",
-        )
-
-    if action_type == "error":
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=data or "No actionable content detected in screenshot.",
-        )
-
-    if not data.strip():
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Vision model response missing 'data'.",
-        )
-
-    return ProcessResponse(type=action_type, data=data)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
