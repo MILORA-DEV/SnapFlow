@@ -1,0 +1,12 @@
+mss>=9.0.2
+Pillow>=10.0.0
+pystray>=0.19.5
+keyboard>=0.13.5
+python-dotenv>=1.0.0
+requests>=2.32.0
+pyperclip>=1.8.2
+customtkinter>=5.2.2
+pyinstaller>=6.0.0
+fastapi==0.115.0
+uvicorn==0.30.1
+pydantic==2.8.2

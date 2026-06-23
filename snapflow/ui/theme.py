@@ -1,0 +1,20 @@
+"""Dark theme tokens for SnapFlow."""
+
+ACCENT = "#0078D4"
+ACCENT_HOVER = "#1084E0"
+SIDEBAR_BG = "#141414"
+CONTENT_BG = "#1E1E1E"
+CARD_BG = "#252526"
+TEXT_MUTED = "#9DA5B4"
+SUCCESS = "#3FB950"
+ERROR = "#F85149"
+
+WINDOW_WIDTH = 920
+WINDOW_HEIGHT = 620
+SIDEBAR_WIDTH = 200
+
+FONT_TITLE = ("Segoe UI", 24, "bold")
+FONT_HEADING = ("Segoe UI", 16, "bold")
+FONT_BODY = ("Segoe UI", 13)
+FONT_SMALL = ("Segoe UI", 11)
+FONT_MONO = ("Consolas", 12)
