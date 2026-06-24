@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, status
+from fastapi import FastAPI, Header, HTTPException
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -16,24 +16,22 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ENV CONFIG
 SNAPFLOW_API_KEY = os.getenv("SNAPFLOW_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "openai/gpt-4o")
 OPENROUTER_REFERER = os.getenv("OPENROUTER_REFERER", "https://snapflow-yini.onrender.com")
 
+# 🔑 NEW: LICENSE SYSTEM
+PRODUCT_ID = os.getenv("PRODUCT_ID", "vmc8y0u9wfnT4MLlAX1jUQ==")
+
 SYSTEM_PROMPT = """Analyze this screenshot. If it contains a date/time, return a calendar event.
 If it contains an address, return a map link. If it contains text, return clean markdown.
 If it contains code, return a code block.
 Output must be valid JSON with exactly this shape:
-{"type": "action_type", "data": "the_processed_content"}
-Use these action_type values:
-- "calendar" — data is JSON string with keys: title, start (ISO 8601), end (ISO 8601, optional), location (optional), description (optional)
-- "map" — data is a full Google Maps URL for the address
-- "markdown" — data is clean markdown text
-- "code" — data is the code content (no markdown fences)
-If nothing useful is detected, use type "error" and data with a short explanation."""
+{"type": "action_type", "data": "the_processed_content"}"""
 
-app = FastAPI(title="SnapFlow Server", version="1.0.0")
+app = FastAPI(title="SnapFlow Server", version="1.1.0")
 
 
 class ProcessRequest(BaseModel):
@@ -45,16 +43,36 @@ class ProcessResponse(BaseModel):
     data: str
 
 
-async def verify_key(x_api_key: str = Header(..., alias="X-API-Key")) -> None:
+# ---------------------------
+# AUTH + LICENSE CHECK
+# ---------------------------
+async def verify_access(
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    x_license_key: str = Header(..., alias="X-License-Key"),
+    x_product_id: str = Header(None, alias="X-Product-Id"),
+) -> None:
+    # Server API key check
     if not SNAPFLOW_API_KEY:
         raise HTTPException(status_code=503, detail="Server API key not configured.")
+
     if x_api_key != SNAPFLOW_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key.")
 
+    # License key check (basic version)
+    if not x_license_key:
+        raise HTTPException(status_code=401, detail="Missing license key.")
+
+    # Optional product lock
+    if x_product_id and x_product_id != PRODUCT_ID:
+        raise HTTPException(status_code=403, detail="Invalid product ID.")
+
+    # Placeholder license validation (replace later with Gumroad/Stripe API)
+    if len(x_license_key) < 10:
+        raise HTTPException(status_code=401, detail="Invalid license key.")
+
 
 @app.get("/health")
-async def health(x_api_key: str = Header(..., alias="X-API-Key")):
-    await verify_key(x_api_key)
+async def health():
     return {"status": "ok"}
 
 
@@ -62,8 +80,10 @@ async def health(x_api_key: str = Header(..., alias="X-API-Key")):
 async def process_screenshot(
     request: ProcessRequest,
     x_api_key: str = Header(..., alias="X-API-Key"),
+    x_license_key: str = Header(..., alias="X-License-Key"),
+    x_product_id: str = Header(None, alias="X-Product-Id"),
 ):
-    await verify_key(x_api_key)
+    await verify_access(x_api_key, x_license_key, x_product_id)
 
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY not configured.")
@@ -90,7 +110,7 @@ async def process_screenshot(
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Analyze this screenshot and return the JSON action."},
+                        {"type": "text", "text": "Analyze this screenshot and return JSON."},
                         {
                             "type": "image_url",
                             "image_url": {"url": f"data:image/png;base64,{image_b64}"},
@@ -102,35 +122,23 @@ async def process_screenshot(
         )
     except Exception as exc:
         logger.exception("Vision API call failed")
-        raise HTTPException(status_code=502, detail=f"Vision API call failed: {exc}") from exc
+        raise HTTPException(status_code=502, detail=str(exc))
 
     raw = (response.choices[0].message.content or "").strip()
-    if not raw:
-        raise HTTPException(status_code=502, detail="Empty response from vision model.")
 
     try:
         payload: dict[str, Any] = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail=f"Invalid JSON from vision model: {raw[:200]}") from exc
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail=f"Bad JSON: {raw[:200]}")
 
-    action_type = str(payload.get("type", "")).strip().lower()
+    action_type = str(payload.get("type", "")).lower()
     data = payload.get("data", "")
 
-    if isinstance(data, dict):
-        data = json.dumps(data)
-    else:
-        data = str(data)
-
-    if not action_type:
-        raise HTTPException(status_code=502, detail="Vision model response missing 'type'.")
+    data = json.dumps(data) if isinstance(data, dict) else str(data)
 
     if action_type == "error":
-        raise HTTPException(status_code=422, detail=data or "No actionable content detected.")
+        raise HTTPException(status_code=422, detail=data)
 
-    if not data.strip():
-        raise HTTPException(status_code=502, detail="Vision model response missing 'data'.")
-
-    logger.info("Processed screenshot: type=%s", action_type)
     return ProcessResponse(type=action_type, data=data)
 
 
