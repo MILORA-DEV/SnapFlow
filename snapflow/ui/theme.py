@@ -10,13 +10,14 @@ SIDEBAR_BG = "#0a0a0b"
 SIDEBAR_BORDER = "#1f1f22"
 CONTENT_BG = "#0d0d0d"
 
-# "Frosted glass" card — a lighter translucent-looking panel with a subtle
+# "Frosted glass" card — a lighter translucent-looking panel with a visible
 # hairline border to fake the blur/elevation you'd get from a real backdrop
-# filter (customtkinter has no real alpha blending for frames).
-CARD_BG = "#17171a"
-CARD_BG_RAISED = "#1c1c20"
-CARD_BORDER = "#2a2a2f"
-CARD_BORDER_SOFT = "#222226"
+# filter (customtkinter has no real alpha blending for frames). Contrast
+# against WINDOW_BG is deliberately pronounced, or the elevation disappears.
+CARD_BG = "#1e1e22"
+CARD_BG_RAISED = "#26262b"
+CARD_BORDER = "#3a3a40"
+CARD_BORDER_SOFT = "#2c2c31"
 DIVIDER = "#1f1f22"
 
 # --- Accents (macOS system palette) -------------------------------------

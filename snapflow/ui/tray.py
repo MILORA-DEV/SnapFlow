@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import sys
 import threading
+from pathlib import Path
 from typing import Callable, Optional
 
 import pystray
@@ -12,15 +14,33 @@ from PIL import Image, ImageDraw
 logger = logging.getLogger(__name__)
 
 
-def _create_icon(size: int = 64) -> Image.Image:
+def _icon_path() -> Path:
+    if getattr(sys, "frozen", False):
+        base = Path(sys._MEIPASS)
+    else:
+        base = Path(__file__).resolve().parent.parent.parent
+    return base / "snapflow" / "assets" / "icon.ico"
+
+
+def _fallback_icon(size: int = 64) -> Image.Image:
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((4, 4, size - 4, size - 4), radius=12, fill=(0, 120, 215, 255))
+    draw.rounded_rectangle((4, 4, size - 4, size - 4), radius=12, fill=(10, 132, 255, 255))
     draw.polygon(
         [(size * 0.28, size * 0.35), (size * 0.72, size * 0.5), (size * 0.28, size * 0.65)],
         fill="white",
     )
     return image
+
+
+def _create_icon(size: int = 64) -> Image.Image:
+    path = _icon_path()
+    if path.exists():
+        try:
+            return Image.open(path).convert("RGBA").resize((size, size))
+        except Exception:
+            logger.debug("Failed to load bundled tray icon, using fallback", exc_info=True)
+    return _fallback_icon(size)
 
 
 class TrayController:

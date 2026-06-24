@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 from functools import partial
 from pathlib import Path
@@ -49,6 +50,14 @@ def _debug(msg: str) -> None:
         f.write(msg + "\n")
 
 
+def _icon_path() -> Path:
+    if getattr(sys, "frozen", False):
+        base = Path(sys._MEIPASS)
+    else:
+        base = Path(__file__).resolve().parent.parent.parent
+    return base / "snapflow" / "assets" / "icon.ico"
+
+
 class SnapFlowApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
@@ -62,6 +71,13 @@ class SnapFlowApp(ctk.CTk):
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.minsize(780, 520)
         self.configure(fg_color=CONTENT_BG)
+
+        icon_path = _icon_path()
+        if icon_path.exists():
+            try:
+                self.iconbitmap(str(icon_path))
+            except Exception as exc:
+                logger.debug("Could not set window icon: %s", exc)
 
         self._settings_manager = get_settings_manager()
         self.history = HistoryStore()

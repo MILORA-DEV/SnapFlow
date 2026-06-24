@@ -24,6 +24,7 @@ a = Analysis(
     binaries=[],
     datas=[
         *customtkinter_datas,
+        ("snapflow/assets/icon.ico", "snapflow/assets"),
     ],
     hiddenimports=[
         "snapflow",
@@ -101,5 +102,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon="snapflow/assets/icon.ico",
 )
