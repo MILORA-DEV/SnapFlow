@@ -18,6 +18,13 @@ class ToastManager:
     MARGIN = 28
     HEIGHT = 58
 
+    # tkinter's place() with rely=1.0 anchors relative to the bottom edge —
+    # positive y pushes *below* that edge (off-screen), negative y pulls
+    # *up* into the visible area. VISIBLE_Y must be negative or the toast
+    # ends up mostly clipped by the window's bottom edge.
+    HIDDEN_Y = HEIGHT + MARGIN + 24
+    VISIBLE_Y = -MARGIN
+
     def __init__(self, root: ctk.CTk) -> None:
         self._root = root
         self._toast: ctk.CTkFrame | None = None
@@ -40,7 +47,7 @@ class ToastManager:
             border_color=CARD_BORDER,
             height=self.HEIGHT,
         )
-        toast.place(relx=0.5, rely=1.0, anchor="s", y=self.MARGIN + self.HEIGHT + 24)
+        toast.place(relx=0.5, rely=1.0, anchor="s", y=self.HIDDEN_Y)
 
         inner = ctk.CTkFrame(toast, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=18, pady=12)
@@ -68,8 +75,8 @@ class ToastManager:
         self._slide_in(toast, 0)
 
     def _slide_in(self, toast: ctk.CTkFrame, step: int) -> None:
-        start_y = self.MARGIN + self.HEIGHT + 24
-        end_y = self.MARGIN
+        start_y = self.HIDDEN_Y
+        end_y = self.VISIBLE_Y
         progress = step / self.SLIDE_STEPS
         eased = 1 - (1 - progress) ** 3
         y = int(start_y - (start_y - end_y) * eased)
@@ -89,8 +96,8 @@ class ToastManager:
         self._slide_out_step(toast, 0)
 
     def _slide_out_step(self, toast: ctk.CTkFrame, step: int) -> None:
-        start_y = self.MARGIN
-        end_y = self.MARGIN + self.HEIGHT + 24
+        start_y = self.VISIBLE_Y
+        end_y = self.HIDDEN_Y
         progress = step / self.SLIDE_STEPS
         eased = progress ** 2
         y = int(start_y + (end_y - start_y) * eased)

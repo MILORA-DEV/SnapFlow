@@ -43,6 +43,9 @@ class ProcessResponse(BaseModel):
 
 class VerifyLicenseRequest(BaseModel):
     license_key: str = Field(..., description="License key entered by the user")
+    increment_uses_count: bool = Field(
+        True, description="Whether this check should count as a Gumroad license use"
+    )
 
 class VerifyLicenseResponse(BaseModel):
     valid: bool
@@ -69,7 +72,7 @@ async def verify_license(request: VerifyLicenseRequest, x_api_key: str = Header(
         {
             "product_id": GUMROAD_PRODUCT_ID,
             "license_key": license_key,
-            "increment_uses_count": "true",
+            "increment_uses_count": "true" if request.increment_uses_count else "false",
         }
     ).encode()
 

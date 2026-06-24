@@ -15,7 +15,7 @@ from snapflow.core.config import AppSettings, get_settings, get_settings_manager
 from snapflow.core.connection import check_server_connection
 from snapflow.core.history import HistoryStore
 from snapflow.core.hotkeys import HotkeyManager
-from snapflow.core.license import is_licensed
+from snapflow.core.license import is_licensed, revalidate_license
 from snapflow.core.pipeline import CapturePipeline, CaptureResult
 from snapflow.ui.license_gate import show_license_gate
 from snapflow.ui.theme import (
@@ -128,6 +128,25 @@ class SnapFlowApp(ctk.CTk):
             show_license_gate(self, self._on_license_success)
         else:
             _debug("Licensed — continuing")
+            threading.Thread(target=self._revalidate_license_async, daemon=True).start()
+
+    def _revalidate_license_async(self) -> None:
+        # Best-effort periodic re-check against Gumroad. Network errors are
+        # inconclusive and leave the cached license untouched on purpose —
+        # this must never lock out an already-activated user over a bad
+        # connection. Only an explicit "invalid" answer re-locks the app.
+        try:
+            still_valid = revalidate_license()
+        except Exception as exc:
+            _debug(f"License revalidation crashed: {exc}")
+            return
+        if not still_valid:
+            _debug("License revoked on revalidation — re-locking app")
+            self.after(0, self._lock_app)
+
+    def _lock_app(self) -> None:
+        self.withdraw()
+        show_license_gate(self, self._on_license_success)
 
     def _on_license_success(self) -> None:
         self.deiconify()
