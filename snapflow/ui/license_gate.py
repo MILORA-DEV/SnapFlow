@@ -1,151 +1,160 @@
-"""License gate — shown on launch if no valid license is saved."""
+"""Modal license-key gate shown on startup when the app isn't licensed."""
+
 from __future__ import annotations
+
 import threading
+from collections.abc import Callable
+
 import customtkinter as ctk
-from snapflow.core.license import validate_license, save_license, load_saved_license
+
+from snapflow.core.license import get_saved_license_key, verify_license
+from snapflow.ui.theme import (
+    ACCENT,
+    ACCENT_HOVER,
+    CARD_BG,
+    CARD_BORDER,
+    CONTENT_BG,
+    ERROR,
+    FONT_BODY,
+    FONT_SMALL,
+    RADIUS_LG,
+    RADIUS_PILL,
+    RADIUS_SM,
+    SUCCESS,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+)
+
+GATE_WIDTH = 420
+GATE_HEIGHT = 320
+
+
+def show_license_gate(master: ctk.CTk, on_success: Callable[[], None]) -> None:
+    """Show a modal window blocking app use until a valid license is entered."""
+    LicenseGate(master, on_success)
+
 
 class LicenseGate(ctk.CTkToplevel):
-    def __init__(self, parent, on_success):
-        super().__init__(parent)
-        self.on_success = on_success
-        self.validated = False
+    def __init__(self, master: ctk.CTk, on_success: Callable[[], None]) -> None:
+        super().__init__(master)
+        self._master = master
+        self._on_success = on_success
 
-        # Window setup
-        self.title("")
+        self.title("Activate SnapFlow")
+        self.geometry(f"{GATE_WIDTH}x{GATE_HEIGHT}")
+        self.minsize(GATE_WIDTH, GATE_HEIGHT)
         self.resizable(False, False)
-        self.geometry("420x320")
-        self.configure(fg_color="#0d0d0d")
-        self.overrideredirect(False)
+        self.configure(fg_color=CONTENT_BG)
 
-        # Center on screen
-        self.update_idletasks()
-        x = (self.winfo_screenwidth() // 2) - 210
-        y = (self.winfo_screenheight() // 2) - 160
-        self.geometry(f"420x320+{x}+{y}")
-
-        # Block interaction with parent
-        self.grab_set()
-        self.lift()
-        self.focus_force()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.after(10, self._center)
 
-        self._build_ui()
-
-    def _build_ui(self):
-        # Logo / title
-        ctk.CTkLabel(
+        card = ctk.CTkFrame(
             self,
-            text="⚡ SnapFlow",
-            font=ctk.CTkFont(size=22, weight="bold"),
-            text_color="#ffffff",
-        ).pack(pady=(36, 4))
-
-        ctk.CTkLabel(
-            self,
-            text="Enter your license key to continue",
-            font=ctk.CTkFont(size=12),
-            text_color="#666666",
-        ).pack(pady=(0, 24))
-
-        # Key input
-        self.key_entry = ctk.CTkEntry(
-            self,
-            width=320,
-            height=42,
-            placeholder_text="XXXX-XXXX-XXXX-XXXX",
-            font=ctk.CTkFont(size=13),
-            fg_color="#1a1a1a",
-            border_color="#2a2a2a",
+            fg_color=CARD_BG,
+            corner_radius=RADIUS_LG,
             border_width=1,
-            text_color="#ffffff",
-            corner_radius=8,
+            border_color=CARD_BORDER,
+        )
+        card.pack(fill="both", expand=True, padx=18, pady=18)
+
+        ctk.CTkLabel(
+            card,
+            text="⚡ SnapFlow",
+            font=("Segoe UI Semibold", 20, "bold"),
+            text_color=TEXT_PRIMARY,
+        ).pack(pady=(28, 4))
+
+        ctk.CTkLabel(
+            card,
+            text="Enter your license key to continue",
+            font=FONT_SMALL,
+            text_color=TEXT_MUTED,
+        ).pack(pady=(0, 18))
+
+        self._entry = ctk.CTkEntry(
+            card,
+            width=300,
+            height=40,
+            corner_radius=RADIUS_SM,
+            border_width=1,
+            border_color=CARD_BORDER,
+            font=FONT_BODY,
+            placeholder_text="XXXX-XXXX-XXXX-XXXX",
             justify="center",
         )
-        self.key_entry.pack(pady=(0, 8))
-        self.key_entry.bind("<Return>", lambda e: self._verify())
+        self._entry.pack(pady=(0, 14))
+        self._entry.insert(0, get_saved_license_key())
+        self._entry.bind("<Return>", lambda _event: self._activate())
+        self._entry.focus_set()
 
-        # Status label
-        self.status_label = ctk.CTkLabel(
-            self,
+        self._status = ctk.CTkLabel(
+            card,
             text="",
-            font=ctk.CTkFont(size=11),
-            text_color="#666666",
-            height=18,
+            font=FONT_SMALL,
+            text_color=ERROR,
+            wraplength=300,
         )
-        self.status_label.pack(pady=(0, 12))
+        self._status.pack(pady=(0, 10))
 
-        # Activate button
-        self.activate_btn = ctk.CTkButton(
-            self,
+        self._button = ctk.CTkButton(
+            card,
             text="Activate",
-            width=320,
-            height=42,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color="#2563eb",
-            hover_color="#1d4ed8",
-            corner_radius=8,
-            command=self._verify,
+            width=300,
+            height=40,
+            corner_radius=RADIUS_PILL,
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER,
+            font=FONT_BODY,
+            command=self._activate,
         )
-        self.activate_btn.pack(pady=(0, 16))
+        self._button.pack(pady=(4, 0))
 
-        # Gumroad link
-        ctk.CTkLabel(
-            self,
-            text="Don't have a license? Get one at gumroad.com",
-            font=ctk.CTkFont(size=10),
-            text_color="#444444",
-            cursor="hand2",
-        ).pack()
+        self.transient(master)
+        self.lift()
+        self.focus_force()
+        self.grab_set()
 
-    def _set_status(self, text: str, color: str = "#666666"):
-        self.status_label.configure(text=text, text_color=color)
-        self.update()
+    def _center(self) -> None:
+        self.update_idletasks()
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        x = (screen_w - GATE_WIDTH) // 2
+        y = (screen_h - GATE_HEIGHT) // 2
+        self.geometry(f"{GATE_WIDTH}x{GATE_HEIGHT}+{x}+{y}")
 
-    def _set_loading(self, loading: bool):
-        if loading:
-            self.activate_btn.configure(text="Verifying...", state="disabled")
-            self.key_entry.configure(state="disabled")
-        else:
-            self.activate_btn.configure(text="Activate", state="normal")
-            self.key_entry.configure(state="normal")
-        self.update()
-
-    def _verify(self):
-        key = self.key_entry.get().strip()
+    def _activate(self) -> None:
+        key = self._entry.get().strip()
         if not key:
-            self._set_status("Please enter your license key.", "#ef4444")
+            self._set_status("Enter a license key.")
             return
 
-        self._set_loading(True)
-        self._set_status("Verifying...", "#666666")
+        self._button.configure(state="disabled", text="Checking...")
+        self._set_status("")
+        threading.Thread(target=self._verify_async, args=(key,), daemon=True).start()
 
-        def do_verify():
-            valid, message = validate_license(key)
-            self.after(0, lambda: self._handle_result(valid, message, key))
+    def _verify_async(self, key: str) -> None:
+        success, message = verify_license(key)
+        self.after(0, lambda: self._on_verified(success, message))
 
-        threading.Thread(target=do_verify, daemon=True).start()
+    def _on_verified(self, success: bool, message: str) -> None:
+        if success:
+            self._set_status(f"✓ {message}", color=SUCCESS)
+            self._button.configure(text="Activated")
+            self.after(500, self._close_success)
+            return
 
-    def _handle_result(self, valid: bool, message: str, key: str):
-        self._set_loading(False)
-        if valid:
-            self._set_status("✓ " + message, "#22c55e")
-            save_license(key)
-            self.after(800, self._succeed)
-        else:
-            self._set_status("✗ " + message, "#ef4444")
+        self._button.configure(state="normal", text="Activate")
+        self._set_status(f"✗ {message}", color=ERROR)
 
-    def _succeed(self):
-        self.validated = True
+    def _close_success(self) -> None:
         self.grab_release()
         self.destroy()
-        self.on_success()
+        self._on_success()
 
-    def _on_close(self):
-        # Don't allow closing without a valid license
-        import sys
-        sys.exit(0)
+    def _set_status(self, message: str, *, color: str = ERROR) -> None:
+        self._status.configure(text=message, text_color=color)
 
-
-def show_license_gate(parent, on_success):
-    gate = LicenseGate(parent, on_success)
-    return gate
+    def _on_close(self) -> None:
+        self._master.after(0, self._master.destroy)
+        self.destroy()

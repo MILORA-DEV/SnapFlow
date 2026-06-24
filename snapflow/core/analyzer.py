@@ -12,7 +12,7 @@ from snapflow.core.config import get_server_config
 
 logger = logging.getLogger(__name__)
 
-REQUEST_TIMEOUT = 90
+REQUEST_TIMEOUT = 90  # Increased to handle Render free-tier cold starts
 
 
 @dataclass
@@ -28,13 +28,14 @@ class AnalyzerError(Exception):
 def analyze_screenshot(image_b64: str) -> AnalysisResult:
     """Send a base64 PNG to the SnapFlow server for processing."""
     server = get_server_config()
-    if not server.api_key:
-        raise AnalyzerError(
-            "Client is not configured. Contact support — SNAPFLOW_API_KEY is missing."
-        )
+    # API key is now hardcoded via gatekeeper - no local check needed
 
-    url = f"{server.url}/process"
+    # Ensure clean URL construction (no double slashes)
+    base_url = server.url.rstrip("/")
+    url = f"{base_url}/process"
     headers = {"X-API-Key": server.api_key}
+
+    logger.info("Sending analysis request to: %s", url)
 
     try:
         response = requests.post(

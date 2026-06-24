@@ -7,7 +7,18 @@ from datetime import datetime
 import customtkinter as ctk
 
 from snapflow.core.history import HistoryEntry
-from snapflow.ui.theme import CARD_BG, FONT_BODY, FONT_HEADING, FONT_SMALL, TEXT_MUTED
+from snapflow.ui.theme import (
+    CARD_BG,
+    CARD_BORDER_SOFT,
+    ERROR,
+    FONT_BODY,
+    FONT_HEADING,
+    FONT_SMALL,
+    RADIUS_MD,
+    SUCCESS,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+)
 
 
 class HistoryView(ctk.CTkFrame):
@@ -19,8 +30,9 @@ class HistoryView(ctk.CTkFrame):
             self,
             text="History",
             font=FONT_HEADING,
+            text_color=TEXT_PRIMARY,
             anchor="w",
-        ).pack(fill="x", padx=32, pady=(28, 4))
+        ).pack(fill="x", padx=36, pady=(30, 4))
 
         ctk.CTkLabel(
             self,
@@ -28,10 +40,10 @@ class HistoryView(ctk.CTkFrame):
             font=FONT_BODY,
             text_color=TEXT_MUTED,
             anchor="w",
-        ).pack(fill="x", padx=32, pady=(0, 16))
+        ).pack(fill="x", padx=36, pady=(0, 16))
 
         self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.scroll.pack(fill="both", expand=True, padx=32, pady=(0, 24))
+        self.scroll.pack(fill="both", expand=True, padx=36, pady=(0, 28))
 
         self.empty_label = ctk.CTkLabel(
             self.scroll,
@@ -65,13 +77,19 @@ class HistoryView(ctk.CTkFrame):
             self._add_card(entry)
 
     def _add_card(self, entry: HistoryEntry) -> None:
-        card = ctk.CTkFrame(self.scroll, fg_color=CARD_BG, corner_radius=12)
+        card = ctk.CTkFrame(
+            self.scroll,
+            fg_color=CARD_BG,
+            corner_radius=RADIUS_MD,
+            border_width=1,
+            border_color=CARD_BORDER_SOFT,
+        )
         card.pack(fill="x", pady=6)
 
         top = ctk.CTkFrame(card, fg_color="transparent")
-        top.pack(fill="x", padx=16, pady=(12, 4))
+        top.pack(fill="x", padx=18, pady=(14, 4))
 
-        badge_color = "#3FB950" if entry.success else "#F85149"
+        badge_color = SUCCESS if entry.success else ERROR
         badge_text = entry.action_type.upper() if entry.action_type else "INFO"
 
         ctk.CTkLabel(
@@ -94,10 +112,11 @@ class HistoryView(ctk.CTkFrame):
             card,
             text=entry.message,
             font=FONT_BODY,
+            text_color=TEXT_PRIMARY,
             anchor="w",
             justify="left",
             wraplength=620,
-        ).pack(fill="x", padx=16, pady=(0, 4))
+        ).pack(fill="x", padx=18, pady=(0, 4))
 
         if entry.preview:
             ctk.CTkLabel(

@@ -5,7 +5,22 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from snapflow.core.config import AppSettings
-from snapflow.ui.theme import ACCENT, FONT_BODY, FONT_HEADING, FONT_SMALL, TEXT_MUTED
+from snapflow.ui.theme import (
+    ACCENT,
+    ACCENT_HOVER,
+    CARD_BG,
+    CARD_BORDER,
+    ERROR,
+    FONT_BODY,
+    FONT_HEADING,
+    FONT_SMALL,
+    RADIUS_LG,
+    RADIUS_PILL,
+    RADIUS_SM,
+    SUCCESS,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+)
 
 
 class SettingsView(ctk.CTkFrame):
@@ -17,8 +32,9 @@ class SettingsView(ctk.CTkFrame):
             self,
             text="Settings",
             font=FONT_HEADING,
+            text_color=TEXT_PRIMARY,
             anchor="w",
-        ).pack(fill="x", padx=32, pady=(28, 4))
+        ).pack(fill="x", padx=36, pady=(30, 4))
 
         ctk.CTkLabel(
             self,
@@ -26,18 +42,30 @@ class SettingsView(ctk.CTkFrame):
             font=FONT_BODY,
             text_color=TEXT_MUTED,
             anchor="w",
-        ).pack(fill="x", padx=32, pady=(0, 20))
+        ).pack(fill="x", padx=36, pady=(0, 20))
 
-        form = ctk.CTkFrame(self, fg_color="transparent")
-        form.pack(fill="both", expand=True, padx=32)
-
-        ctk.CTkLabel(form, text="Capture Hotkey", font=FONT_BODY, anchor="w").pack(
-            fill="x", pady=(0, 4)
+        card = ctk.CTkFrame(
+            self,
+            fg_color=CARD_BG,
+            corner_radius=RADIUS_LG,
+            border_width=1,
+            border_color=CARD_BORDER,
         )
+        card.pack(fill="both", expand=True, padx=36, pady=(0, 28))
+
+        form = ctk.CTkFrame(card, fg_color="transparent")
+        form.pack(fill="both", expand=True, padx=28, pady=28)
+
+        ctk.CTkLabel(
+            form, text="Capture Hotkey", font=FONT_BODY, text_color=TEXT_PRIMARY, anchor="w"
+        ).pack(fill="x", pady=(0, 6))
         self.hotkey_entry = ctk.CTkEntry(
             form,
             placeholder_text="ctrl+shift+a",
-            height=40,
+            height=42,
+            corner_radius=RADIUS_SM,
+            border_width=1,
+            border_color=CARD_BORDER,
         )
         self.hotkey_entry.pack(fill="x", pady=(0, 4))
 
@@ -47,7 +75,7 @@ class SettingsView(ctk.CTkFrame):
             font=FONT_SMALL,
             text_color=TEXT_MUTED,
             anchor="w",
-        ).pack(fill="x", pady=(0, 20))
+        ).pack(fill="x", pady=(0, 22))
 
         btn_row = ctk.CTkFrame(form, fg_color="transparent")
         btn_row.pack(fill="x")
@@ -55,10 +83,11 @@ class SettingsView(ctk.CTkFrame):
         self.save_btn = ctk.CTkButton(
             btn_row,
             text="Save",
-            width=120,
+            width=130,
             height=40,
+            corner_radius=RADIUS_PILL,
             fg_color=ACCENT,
-            hover_color="#1084E0",
+            hover_color=ACCENT_HOVER,
             command=self._save,
         )
         self.save_btn.pack(side="left")
@@ -70,6 +99,8 @@ class SettingsView(ctk.CTkFrame):
             anchor="w",
         )
         self.feedback_label.pack(side="left", padx=16)
+        self._success_color = SUCCESS
+        self._error_color = ERROR
 
     def on_show(self) -> None:
         settings = self.app.settings
@@ -84,6 +115,6 @@ class SettingsView(ctk.CTkFrame):
         try:
             self.app.save_settings(settings)
         except Exception as exc:
-            self.feedback_label.configure(text=str(exc), text_color="#F85149")
+            self.feedback_label.configure(text=str(exc), text_color=self._error_color)
             return
-        self.feedback_label.configure(text="Saved.", text_color="#3FB950")
+        self.feedback_label.configure(text="Saved.", text_color=self._success_color)

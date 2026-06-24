@@ -21,9 +21,13 @@ from snapflow.ui.theme import (
     ACCENT,
     CONTENT_BG,
     FONT_BODY,
+    FONT_BODY_MEDIUM,
     FONT_SMALL,
+    RADIUS_PILL,
     SIDEBAR_BG,
+    SIDEBAR_BORDER,
     SIDEBAR_WIDTH,
+    TEXT_FAINT,
     TEXT_MUTED,
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
@@ -115,7 +119,7 @@ class SnapFlowApp(ctk.CTk):
         self.focus_force()
 
     def _build_layout(self) -> None:
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         self.sidebar = ctk.CTkFrame(
@@ -124,12 +128,18 @@ class SnapFlowApp(ctk.CTk):
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_propagate(False)
 
-        ctk.CTkLabel(
+        # Hairline divider standing in for the blur seam of a real vibrancy panel.
+        divider = ctk.CTkFrame(self, width=1, fg_color=SIDEBAR_BORDER, corner_radius=0)
+        divider.grid(row=0, column=1, sticky="nsew")
+
+        brand = ctk.CTkLabel(
             self.sidebar,
-            text="⚡ SnapFlow",
-            font=("Segoe UI", 18, "bold"),
+            text="⚡  SnapFlow",
+            font=("Segoe UI Semibold", 16, "bold"),
+            text_color="#FFFFFF",
             anchor="w",
-        ).pack(fill="x", padx=20, pady=(24, 32))
+        )
+        brand.pack(fill="x", padx=22, pady=(26, 28))
 
         nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         nav_frame.pack(fill="x", expand=True)
@@ -143,38 +153,45 @@ class SnapFlowApp(ctk.CTk):
                 nav_frame,
                 text=label,
                 anchor="w",
-                height=40,
+                height=38,
+                corner_radius=RADIUS_PILL,
                 fg_color="transparent",
-                hover_color="#2A2A2A",
+                hover_color="#1d1d20",
+                text_color=TEXT_MUTED,
                 font=FONT_BODY,
                 command=lambda k=key: self.show_view(k),
             )
-            btn.pack(fill="x", padx=12, pady=4)
+            btn.pack(fill="x", padx=14, pady=3)
             self._nav_buttons[key] = btn
 
         footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        footer.pack(fill="x", side="bottom", padx=12, pady=16)
+        footer.pack(fill="x", side="bottom", padx=14, pady=18)
+
+        ctk.CTkFrame(footer, height=1, fg_color=SIDEBAR_BORDER).pack(
+            fill="x", pady=(0, 12)
+        )
 
         ctk.CTkButton(
             footer,
             text="Check for Updates",
-            height=36,
+            height=32,
+            corner_radius=RADIUS_PILL,
             fg_color="transparent",
-            hover_color="#2A2A2A",
+            hover_color="#1d1d20",
             font=FONT_SMALL,
             text_color=TEXT_MUTED,
             command=self._check_for_updates,
-        ).pack(fill="x", pady=(0, 8))
+        ).pack(fill="x", pady=(0, 6))
 
         ctk.CTkLabel(
             footer,
             text=f"v{APP_VERSION}",
             font=FONT_SMALL,
-            text_color=TEXT_MUTED,
+            text_color=TEXT_FAINT,
         ).pack()
 
         self.content = ctk.CTkFrame(self, fg_color=CONTENT_BG, corner_radius=0)
-        self.content.grid(row=0, column=1, sticky="nsew")
+        self.content.grid(row=0, column=2, sticky="nsew")
         self.content.grid_columnconfigure(0, weight=1)
         self.content.grid_rowconfigure(0, weight=1)
 
@@ -191,7 +208,12 @@ class SnapFlowApp(ctk.CTk):
             return
 
         for key, btn in self._nav_buttons.items():
-            btn.configure(fg_color=ACCENT if key == name else "transparent")
+            active = key == name
+            btn.configure(
+                fg_color=ACCENT if active else "transparent",
+                text_color="#FFFFFF" if active else TEXT_MUTED,
+                font=FONT_BODY_MEDIUM if active else FONT_BODY,
+            )
 
         self._views[name].tkraise()
         on_show = getattr(self._views[name], "on_show", None)

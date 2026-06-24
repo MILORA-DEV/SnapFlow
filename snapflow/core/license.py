@@ -1,59 +1,97 @@
-"""License validation via Gumroad's built-in license API."""
+"""License verification against the SnapFlow gatekeeper server."""
+
 from __future__ import annotations
+
 import json
-import os
-from pathlib import Path
+import logging
+
 import requests
 
-GUMROAD_PRODUCT_PERMALINK = "YOUR_PRODUCT_PERMALINK"  # e.g. "snapflow" from your Gumroad URL
-LICENSE_PATH = Path(os.environ.get("APPDATA", Path.home())) / "SnapFlow" / "license.json"
+from snapflow.core.config import DATA_DIR, get_server_config
 
-def save_license(key: str) -> None:
-    LICENSE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    LICENSE_PATH.write_text(json.dumps({"key": key}), encoding="utf-8")
+logger = logging.getLogger(__name__)
 
-def load_saved_license() -> str | None:
-    try:
-        if LICENSE_PATH.exists():
-            data = json.loads(LICENSE_PATH.read_text(encoding="utf-8"))
-            return data.get("key")
-    except Exception:
-        pass
-    return None
+LICENSE_PATH = DATA_DIR / "license.json"
+VERIFY_TIMEOUT = 30
 
-def validate_license(key: str) -> tuple[bool, str]:
-    """
-    Validate a license key against Gumroad's API.
-    Returns (is_valid, message).
-    """
-    if not key or not key.strip():
-        return False, "Please enter a license key."
-    try:
-        response = requests.post(
-            "https://api.gumroad.com/v2/licenses/verify",
-            data={
-                "product_permalink": GUMROAD_PRODUCT_PERMALINK,
-                "license_key": key.strip(),
-            },
-            timeout=10,
-        )
-        data = response.json()
-        if data.get("success"):
-            # Check it hasn't been refunded or chargebacked
-            purchase = data.get("purchase", {})
-            if purchase.get("refunded") or purchase.get("chargebacked"):
-                return False, "This license has been refunded and is no longer valid."
-            return True, "License activated successfully."
-        else:
-            return False, data.get("message", "Invalid license key.")
-    except requests.exceptions.Timeout:
-        return False, "Connection timed out. Check your internet and try again."
-    except requests.exceptions.ConnectionError:
-        return False, "No internet connection. Please connect and try again."
-    except Exception as e:
-        return False, f"Verification failed: {str(e)}"
 
 def is_licensed() -> bool:
-    """Quick check — is there a saved license key?"""
-    key = load_saved_license()
-    return bool(key and key.strip())
+    """Check the locally cached license state (no network call)."""
+    if not LICENSE_PATH.exists():
+        return False
+    try:
+        data = json.loads(LICENSE_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    return bool(data.get("licensed")) and bool(data.get("license_key"))
+
+
+def get_saved_license_key() -> str:
+    """Return the last license key entered, if any (for pre-filling the gate)."""
+    if not LICENSE_PATH.exists():
+        return ""
+    try:
+        data = json.loads(LICENSE_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return ""
+    return str(data.get("license_key", ""))
+
+
+def save_license(license_key: str) -> None:
+    LICENSE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LICENSE_PATH.write_text(
+        json.dumps({"licensed": True, "license_key": license_key}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def clear_license() -> None:
+    if LICENSE_PATH.exists():
+        LICENSE_PATH.unlink()
+
+
+def verify_license(license_key: str) -> tuple[bool, str]:
+    """
+    Verify a license key against the SnapFlow gatekeeper server.
+    On success, persists it locally so future launches skip the network check.
+    Returns (success, message).
+    """
+    license_key = license_key.strip()
+    if not license_key:
+        return False, "Enter a license key."
+
+    server = get_server_config()
+    url = f"{server.url}/verify-license"
+    headers = {"X-API-Key": server.api_key}
+
+    try:
+        response = requests.post(
+            url,
+            json={"license_key": license_key},
+            headers=headers,
+            timeout=VERIFY_TIMEOUT,
+        )
+    except requests.ConnectionError:
+        return False, "Cannot reach the license server. Check your connection."
+    except requests.Timeout:
+        return False, "License check timed out. Please try again."
+    except requests.RequestException as exc:
+        logger.debug("License verification failed: %s", exc)
+        return False, "License check failed."
+
+    if response.status_code == 401:
+        return False, "Invalid license key."
+
+    if not response.ok:
+        return False, f"License server error ({response.status_code})."
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return False, "Invalid response from license server."
+
+    if not payload.get("valid"):
+        return False, str(payload.get("message", "Invalid license key."))
+
+    save_license(license_key)
+    return True, "License activated."

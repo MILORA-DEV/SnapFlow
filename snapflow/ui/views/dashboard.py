@@ -6,14 +6,22 @@ import customtkinter as ctk
 
 from snapflow.ui.theme import (
     ACCENT,
+    ACCENT_HOVER,
     CARD_BG,
+    CARD_BG_RAISED,
+    CARD_BORDER,
+    CARD_BORDER_SOFT,
     ERROR,
     FONT_BODY,
     FONT_HEADING,
     FONT_SMALL,
     FONT_TITLE,
+    RADIUS_LG,
+    RADIUS_MD,
+    RADIUS_PILL,
     SUCCESS,
     TEXT_MUTED,
+    TEXT_PRIMARY,
 )
 
 
@@ -23,7 +31,7 @@ class DashboardView(ctk.CTkFrame):
         self.app = app
 
         top_row = ctk.CTkFrame(self, fg_color="transparent")
-        top_row.pack(fill="x", padx=32, pady=(28, 0))
+        top_row.pack(fill="x", padx=36, pady=(30, 0))
 
         header_block = ctk.CTkFrame(top_row, fg_color="transparent")
         header_block.pack(side="left", fill="x", expand=True)
@@ -32,6 +40,7 @@ class DashboardView(ctk.CTkFrame):
             header_block,
             text="SnapFlow",
             font=FONT_TITLE,
+            text_color=TEXT_PRIMARY,
             anchor="w",
         ).pack(fill="x")
 
@@ -46,7 +55,9 @@ class DashboardView(ctk.CTkFrame):
         self.connection_frame = ctk.CTkFrame(
             top_row,
             fg_color=CARD_BG,
-            corner_radius=20,
+            corner_radius=RADIUS_PILL,
+            border_width=1,
+            border_color=CARD_BORDER_SOFT,
             height=36,
         )
         self.connection_frame.pack(side="right", padx=(12, 0))
@@ -72,17 +83,23 @@ class DashboardView(ctk.CTkFrame):
         )
         self.conn_label.pack(side="left")
 
-        card = ctk.CTkFrame(self, fg_color=CARD_BG, corner_radius=16)
-        card.pack(fill="both", expand=True, padx=32, pady=(20, 24))
+        card = ctk.CTkFrame(
+            self,
+            fg_color=CARD_BG,
+            corner_radius=RADIUS_LG,
+            border_width=1,
+            border_color=CARD_BORDER,
+        )
+        card.pack(fill="both", expand=True, padx=36, pady=(22, 28))
 
         inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.place(relx=0.5, rely=0.45, anchor="center")
+        inner.place(relx=0.5, rely=0.42, anchor="center")
 
         self.status_label = ctk.CTkLabel(
             inner,
             text="Ready",
             font=FONT_HEADING,
-            text_color=TEXT_MUTED,
+            text_color=TEXT_PRIMARY,
         )
         self.status_label.pack(pady=(0, 8))
 
@@ -92,16 +109,17 @@ class DashboardView(ctk.CTkFrame):
             font=FONT_SMALL,
             text_color=TEXT_MUTED,
         )
-        self.hotkey_label.pack(pady=(0, 20))
+        self.hotkey_label.pack(pady=(0, 22))
 
         self.capture_btn = ctk.CTkButton(
             inner,
             text="Capture Region",
-            width=220,
+            width=230,
             height=48,
+            corner_radius=RADIUS_PILL,
             font=FONT_BODY,
             fg_color=ACCENT,
-            hover_color="#1084E0",
+            hover_color=ACCENT_HOVER,
             command=self.app.request_capture,
         )
         self.capture_btn.pack(pady=(0, 12))
@@ -113,8 +131,14 @@ class DashboardView(ctk.CTkFrame):
             text_color=TEXT_MUTED,
         ).pack()
 
-        self.last_action_frame = ctk.CTkFrame(card, fg_color="#1A1A1A", corner_radius=12)
-        self.last_action_frame.pack(fill="x", padx=24, pady=24, side="bottom")
+        self.last_action_frame = ctk.CTkFrame(
+            card,
+            fg_color=CARD_BG_RAISED,
+            corner_radius=RADIUS_MD,
+            border_width=1,
+            border_color=CARD_BORDER_SOFT,
+        )
+        self.last_action_frame.pack(fill="x", padx=26, pady=26, side="bottom")
 
         ctk.CTkLabel(
             self.last_action_frame,

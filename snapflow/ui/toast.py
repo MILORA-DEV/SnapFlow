@@ -6,7 +6,7 @@ from functools import partial
 
 import customtkinter as ctk
 
-from snapflow.ui.theme import FONT_BODY, SUCCESS
+from snapflow.ui.theme import ACCENT, CARD_BG_RAISED, CARD_BORDER, FONT_BODY, RADIUS_MD, SUCCESS, TEXT_PRIMARY
 
 
 class ToastManager:
@@ -27,17 +27,17 @@ class ToastManager:
         self._root.after(0, partial(self._show, message, accent=SUCCESS))
 
     def show_info(self, message: str) -> None:
-        self._root.after(0, partial(self._show, message, accent="#0078D4"))
+        self._root.after(0, partial(self._show, message, accent=ACCENT))
 
     def _show(self, message: str, *, accent: str) -> None:
         self._dismiss()
 
         toast = ctk.CTkFrame(
             self._root,
-            fg_color="#2A2A2A",
-            corner_radius=16,
+            fg_color=CARD_BG_RAISED,
+            corner_radius=RADIUS_MD,
             border_width=1,
-            border_color=accent,
+            border_color=CARD_BORDER,
             height=self.HEIGHT,
         )
         toast.place(relx=0.5, rely=1.0, anchor="s", y=self.MARGIN + self.HEIGHT + 24)
@@ -57,7 +57,7 @@ class ToastManager:
             inner,
             text=message,
             font=FONT_BODY,
-            text_color="#F0F0F0",
+            text_color=TEXT_PRIMARY,
             anchor="w",
             justify="left",
             wraplength=420,
