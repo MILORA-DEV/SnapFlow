@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from functools import partial
+from pathlib import Path
 
 import customtkinter as ctk
 
@@ -12,7 +14,9 @@ from snapflow.core.config import AppSettings, get_settings, get_settings_manager
 from snapflow.core.connection import check_server_connection
 from snapflow.core.history import HistoryStore
 from snapflow.core.hotkeys import HotkeyManager
+from snapflow.core.license import is_licensed
 from snapflow.core.pipeline import CapturePipeline, CaptureResult
+from snapflow.ui.license_gate import show_license_gate
 from snapflow.ui.theme import (
     ACCENT,
     CONTENT_BG,
@@ -32,11 +36,20 @@ logger = logging.getLogger(__name__)
 
 CONNECTION_POLL_MS = 20_000
 APP_VERSION = "1.0.0"
+DEBUG_LOG = Path(os.environ.get("APPDATA", Path.home())) / "SnapFlow" / "debug.txt"
+
+
+def _debug(msg: str) -> None:
+    DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(DEBUG_LOG, "a") as f:
+        f.write(msg + "\n")
 
 
 class SnapFlowApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
+
+        _debug("=== APP STARTING ===")
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -79,10 +92,27 @@ class SnapFlowApp(ctk.CTk):
         self._register_hotkey()
         self._schedule_connection_poll()
         logger.info("SnapFlow v%s ready. Hotkey: %s", APP_VERSION, settings.hotkey)
+        _debug("App fully initialized, scheduling license check")
+
+        self.after(100, self._check_license)
 
     @property
     def settings(self) -> AppSettings:
         return get_settings()
+
+    def _check_license(self) -> None:
+        _debug("License check running")
+        if not is_licensed():
+            _debug("Not licensed — showing gate")
+            self.withdraw()
+            show_license_gate(self, self._on_license_success)
+        else:
+            _debug("Licensed — continuing")
+
+    def _on_license_success(self) -> None:
+        self.deiconify()
+        self.lift()
+        self.focus_force()
 
     def _build_layout(self) -> None:
         self.grid_columnconfigure(1, weight=1)
@@ -184,8 +214,14 @@ class SnapFlowApp(ctk.CTk):
         threading.Thread(target=self._check_connection_async, daemon=True).start()
 
     def _check_connection_async(self) -> None:
-        connected, label = check_server_connection()
-        self.after(0, partial(self._apply_connection_status, connected, label))
+        try:
+            _debug("Starting connection check...")
+            connected, label = check_server_connection()
+            _debug(f"Connection result: {connected} | {label}")
+            self.after(0, partial(self._apply_connection_status, connected, label))
+        except Exception as e:
+            _debug(f"CRASH in connection check: {type(e).__name__}: {e}")
+            self.after(0, partial(self._apply_connection_status, False, "Offline"))
 
     def _apply_connection_status(self, connected: bool, label: str) -> None:
         dashboard = self._views.get("dashboard")
