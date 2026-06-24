@@ -7,6 +7,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from dotenv import dotenv_values, load_dotenv
 
+GUMROAD_SERVER_URL = "https://snapflow-yini.onrender.com"
+GUMROAD_API_KEY = "Sf9!kX27#mQ_vPz4"
+
 def get_data_dir() -> Path:
     """Persistent app data directory."""
     if getattr(sys, "frozen", False):
@@ -22,22 +25,25 @@ HISTORY_PATH = DATA_DIR / "history.json"
 OUTPUT_DIR = DATA_DIR / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# ENV_PATH always lives in AppData so users never have to touch it
 ENV_PATH = DATA_DIR / ".env"
 
-# If no .env exists in AppData yet, seed it from the bundled one (dev) or leave blank
-if not ENV_PATH.exists():
-    if not getattr(sys, "frozen", False):
-        # Dev mode: try project root .env
+# Always write the correct values — never leave blank
+if getattr(sys, "frozen", False):
+    # Frozen: always seed with real server details
+    existing = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
+    hotkey = existing.get("SNAPFLOW_HOTKEY", "ctrl+shift+a")
+    ENV_PATH.write_text(
+        f"SNAPFLOW_SERVER_URL={GUMROAD_SERVER_URL}\n"
+        f"SNAPFLOW_API_KEY={GUMROAD_API_KEY}\n"
+        f"SNAPFLOW_HOTKEY={hotkey}\n"
+    )
+else:
+    # Dev mode: copy from project root if AppData .env doesn't exist
+    if not ENV_PATH.exists():
         project_env = Path(__file__).resolve().parent.parent.parent / ".env"
         if project_env.exists():
             import shutil
             shutil.copy(project_env, ENV_PATH)
-    else:
-        # Frozen: write a blank template so load_dotenv doesn't fail
-        ENV_PATH.write_text(
-            "SNAPFLOW_SERVER_URL=\nSNAPFLOW_API_KEY=\nSNAPFLOW_HOTKEY=ctrl+shift+a\n"
-        )
 
 load_dotenv(ENV_PATH)
 
@@ -93,13 +99,22 @@ class SettingsManager:
         os.environ["SNAPFLOW_HOTKEY"] = self._settings.hotkey
 
     def _sync_env_file(self) -> None:
+        # Only save hotkey — never overwrite server URL or API key
         existing = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
-        lines = [
-            f"SNAPFLOW_HOTKEY={self._settings.hotkey}",
-            f"SNAPFLOW_SERVER_URL={existing.get('SNAPFLOW_SERVER_URL', '')}",
-            f"SNAPFLOW_API_KEY={existing.get('SNAPFLOW_API_KEY', '')}",
-        ]
-        ENV_PATH.write_text("\n".join(lines) + "\n")
+        ENV_PATH.write_text(
+            f"SNAPFLOW_HOTKEY={self._settings.hotkey}\n"
+            f"SNAPFLOW_SERVER_URL={existing.get('SNAPFLOW_SERVER_URL', GUMROAD_SERVER_URL)}\n"
+            f"SNAPFLOW_API_KEY={existing.get('SNAPFLOW_API_KEY', GUMROAD_API_KEY)}\n"
+        )
+
+    def _check_server_credentials(self) -> None:
+        existing = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
+        if not existing.get("SNAPFLOW_SERVER_URL") or not existing.get("SNAPFLOW_API_KEY"):
+            ENV_PATH.write_text(
+                f"SNAPFLOW_HOTKEY={self._settings.hotkey}\n"
+                f"SNAPFLOW_SERVER_URL={GUMROAD_SERVER_URL}\n"
+                f"SNAPFLOW_API_KEY={GUMROAD_API_KEY}\n"
+            )
 
 _settings_manager: SettingsManager | None = None
 
@@ -113,24 +128,23 @@ def get_settings() -> AppSettings:
     return get_settings_manager().settings
 
 def get_server_config() -> ServerConfig:
-    """Read server config — checks settings.json first, then .env in AppData."""
-    url = ""
-    api_key = ""
+    """Read server config — always falls back to hardcoded values."""
+    url = GUMROAD_SERVER_URL
+    api_key = GUMROAD_API_KEY
 
     if SETTINGS_PATH.exists():
         try:
             raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-            url = raw.get("server_url", url)
-            api_key = raw.get("api_key", api_key)
+            url = raw.get("server_url") or url
+            api_key = raw.get("api_key") or api_key
         except (json.JSONDecodeError, TypeError):
             pass
 
-    if not api_key or not url:
-        env = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
-        url = env.get("SNAPFLOW_SERVER_URL", url)
-        api_key = env.get("SNAPFLOW_API_KEY", api_key)
+    env = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
+    url = env.get("SNAPFLOW_SERVER_URL") or url
+    api_key = env.get("SNAPFLOW_API_KEY") or api_key
 
     return ServerConfig(
-        url=url.rstrip("/") if url else "",
+        url=url.rstrip("/"),
         api_key=api_key,
     )
